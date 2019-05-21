@@ -39,7 +39,7 @@ CODE
 end
 
 def setup_tailwindcss
-  run "yarn add tailwindcss@next"
+  run "yarn add tailwindcss"
   run "mkdir -p frontend/stylesheets"
 
   inject_into_file "./.postcssrc.yml", "\n  tailwindcss: {}", after: "postcss-cssnext: {}"
