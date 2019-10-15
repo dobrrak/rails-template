@@ -1,14 +1,17 @@
-def add_gems
-  gem "foreman", "~> 0.85.0"
-  gem "webpacker", "~> 3.5", ">= 3.5.5"
-end
-
 def set_application_name
-  environment "config.application_name = Rails.application.class.parent_name"
+  environment "config.application_name = Rails.application.class.module_parent_name"
 end
 
-def install_webpacker
-  rails_command "webpacker:install"
+def disable_default_generators
+file 'config/initializers/generators.rb', <<-CODE
+Rails.application.config.generators do |g|
+  g.javascripts false
+  g.jbuilder false
+  g.stylesheets false
+  g.assets false
+  g.helper false
+end
+CODE
 end
 
 def change_webpacker_config_file
@@ -24,33 +27,69 @@ def move_webpacker_javascript_directory_to_root
   change_webpacker_config_file
 end
 
-def setup_images_for_webpack
-file "frontend/packs/images.js", <<-CODE
-import "../images"
-CODE
-
-file "frontend/images/index.js", <<-CODE
-function importAll(r) {
-  return r.keys().map(r);
-}
-
-const images = importAll(require.context("./", true, /\.(png|jpe?g|svg)$/));
-CODE
-end
-
 def setup_tailwindcss
   run "yarn add tailwindcss"
   run "mkdir -p frontend/stylesheets"
+  run "mkdir -p frontend/images"
 
-  inject_into_file "./.postcssrc.yml", "\n  tailwindcss: {}", after: "postcss-cssnext: {}"
 
-file "frontend/stylesheets/application.css", <<-CODE
-/* All your Css goes here */
+file "frontend/stylesheets/application.scss", <<-CODE
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+
+/* Example structure/organisation could be as follows:
+@import "settings";
+@import "base";
+@import "objects";
+@import components";
+*/
+
+
+@import "tailwindcss/utilities";
 CODE
 end
 
 def setup_stimulus
   run "bundle exec rails webpacker:install:stimulus"
+end
+
+def add_purgecss
+  run "yarn add @fullhuman/postcss-purgecss"
+end
+
+def setup_postcss_config
+  run 'rm -f postcss.config.js'
+
+file "postcss.config.js", <<-CODE
+let environment = {
+  plugins: [
+    require("tailwindcss"),
+    require("postcss-import"),
+    require("postcss-flexbugs-fixes"),
+    require("postcss-preset-env")({
+      autoprefixer: {
+        flexbox: "no-2009"
+      },
+      stage: 3
+    }),
+  ]
+}
+
+if (process.env.RAILS_ENV === "production") {
+  environment.plugins.push(
+    require("@fullhuman/postcss-purgecss")({
+      content: [
+        "./app/views/**/*.html.erb",
+        "./app/helpers/**/*rb",
+        "./frontend/controllers/**/*.js"
+      ],
+      defaultExtractor: content => content.match(/[\\w-/:]+(?<!:)/g) || []
+    })
+  )
+}
+
+module.exports = environment
+CODE
 end
 
 def remove_default_assets
@@ -75,13 +114,19 @@ file "frontend/packs/application.js", <<-CODE
 /* eslint no-console:0 */
 
 import { Application } from "stimulus"
+require("@rails/ujs").start()
+require("turbolinks").start()
+require("@rails/activestorage").start()
+
 import { definitionsFromContext } from "stimulus/webpack-helpers"
+require("stylesheets/application.scss")
 
 const application = Application.start()
 const context = require.context("controllers", true, /.js$/)
 application.load(definitionsFromContext(context))
 
-import "../stylesheets/application.css"
+const images = require.context('../images', true)
+const imagePath = (name) => images(name, true)
 CODE
 end
 
@@ -94,23 +139,21 @@ def stop_spring
   run "spring stop"
 end
 
-add_gems
-
 after_bundle do
   set_application_name
+  disable_default_generators
   stop_spring
-  install_webpacker
   move_webpacker_javascript_directory_to_root
-  setup_images_for_webpack
   setup_tailwindcss
   setup_stimulus
+  add_purgecss
+  setup_postcss_config
   add_foreman
   remove_default_assets
   setup_application_pack_file
   replace_application_include_tags
 
   rails_command "db:create"
-  rails_command "db:migrate"
 
   git :init
   git add: "."
