@@ -32,6 +32,13 @@ def setup_tailwindcss
   run "mkdir -p frontend/stylesheets"
   run "mkdir -p frontend/images"
 
+  file "tailwindcss.config.js", <<-CODE
+module.exports = {
+  theme: {},
+  variants: {},
+  plugins: [],
+}
+  CODE
 
 file "frontend/stylesheets/application.scss", <<-CODE
 @import "tailwindcss/base";
@@ -63,7 +70,7 @@ def setup_postcss_config
 file "postcss.config.js", <<-CODE
 let environment = {
   plugins: [
-    require("tailwindcss"),
+    require("tailwindcss")('./tailwindcss.config.js'),
     require("postcss-import"),
     require("postcss-flexbugs-fixes"),
     require("postcss-preset-env")({
