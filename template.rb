@@ -168,7 +168,7 @@ after_bundle do
 
   say "============================================================="
   say ""
-  say "💡 Sjabloon LITE is successfully installed! ✨", :yellow
+  say "💡 Sjabloon LITE (om...) is successfully installed! ✨", :yellow
   say "For more features, designed templates, fully configuration,", :yellow
   say "UI components and billing with Stripe, check out https://www.getsjabloon.com (💡 cmd + click to open).", :yellow
   say ""
